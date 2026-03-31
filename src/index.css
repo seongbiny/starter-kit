@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+/* 게임 커스텀 CSS 변수 */
+@theme {
+  /* 게임 컬러 팔레트 */
+  --color-game-primary: #6366f1;
+  --color-game-primary-dark: #4f46e5;
+  --color-game-accent: #f59e0b;
+  --color-game-accent-dark: #d97706;
+  --color-game-danger: #ef4444;
+  --color-game-danger-dark: #dc2626;
+  --color-game-success: #10b981;
+  --color-game-dark: #0f0f1a;
+  --color-game-dark-2: #1a1a2e;
+  --color-game-dark-3: #16213e;
+  --color-game-surface: rgba(255, 255, 255, 0.05);
+  --color-game-border: rgba(255, 255, 255, 0.1);
+
+  /* 게임 폰트 */
+  --font-game: "Press Start 2P", monospace;
+}
+
+/* 전역 기본 스타일 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--color-game-dark);
+  color: white;
+  font-family: system-ui, sans-serif;
+}
