@@ -1,0 +1,48 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat | jq -r '.prompt // \"\"' | head -c 100 > /tmp/claude_last_prompt.txt",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.tool_name // \"알 수 없음\"'); DETAIL=$(echo \"$INPUT\" | jq -r '.tool_input.command // .tool_input.file_path // .tool_input.path // \"\"' | head -c 120); TIME=$(date '+%Y-%m-%d %H:%M:%S'); curl -s -X POST -H 'Content-type: application/json' --data \"{\\\"text\\\": \\\":warning: *Claude 권한 요청* | $TIME\\\\n도구: $TOOL\\\\n내용: $DETAIL\\\"}\" \"$SLACK_WEBHOOK_URL\"",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); NOTIF=$(echo \"$INPUT\" | jq -r '.params.message // \"확인이 필요합니다\"'); TIME=$(date '+%Y-%m-%d %H:%M:%S'); curl -s -X POST -H 'Content-type: application/json' --data \"{\\\"text\\\": \\\":bell: *Claude 알림* | $TIME\\\\n$NOTIF\\\"}\" \"$SLACK_WEBHOOK_URL\"",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROMPT=$(cat /tmp/claude_last_prompt.txt 2>/dev/null || echo '작업 완료'); TIME=$(date '+%Y-%m-%d %H:%M:%S'); curl -s -X POST -H 'Content-type: application/json' --data \"{\\\"text\\\": \\\":white_check_mark: *Claude 작업 완료* | $TIME\\\\n$PROMPT\\\"}\" \"$SLACK_WEBHOOK_URL\"",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

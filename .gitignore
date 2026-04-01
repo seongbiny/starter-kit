@@ -13,6 +13,9 @@ dist-ssr
 *.local
 *.env
 
+# Claude Code 로컬 설정 (webhook URL 등 민감 정보 포함)
+.claude/settings.local.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
