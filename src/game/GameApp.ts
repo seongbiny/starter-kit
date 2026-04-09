@@ -1,47 +1,23 @@
-import { Application } from 'pixi.js'
-import type { GameConfig } from '@/types/game.types'
+import Phaser from 'phaser'
 import { useGameStore } from '@/stores/gameStore'
-import { useUiStore } from '@/stores/uiStore'
-import { SceneManager } from './scenes/SceneManager'
-import { AssetManager } from './managers/AssetManager'
+import { PreloadScene } from './scenes/PreloadScene'
+import { GameScene } from './scenes/GameScene'
 import { AudioManager } from './managers/AudioManager'
-import { InputManager } from './managers/InputManager'
-
-// 기본 게임 설정
-const DEFAULT_CONFIG: GameConfig = {
-  width: 800,
-  height: 600,
-  backgroundColor: 0x0f0f1a,
-  antialias: true,
-  resolution: window.devicePixelRatio || 1,
-}
 
 /**
- * PixiJS 애플리케이션 싱글턴
- * React StrictMode 이중 실행 방어를 위해 인스턴스 캐싱
+ * Phaser 게임 싱글턴
+ * React StrictMode 이중 실행 방어 및 Zustand ↔ Phaser 브릿지
  */
 export class GameApp {
   private static instance: GameApp | null = null
 
-  readonly app: Application
-  readonly sceneManager: SceneManager
-  readonly assetManager: AssetManager
+  private game: Phaser.Game | null = null
   readonly audioManager: AudioManager
-  readonly inputManager: InputManager
-
-  private isInitialized = false
 
   private constructor() {
-    this.app = new Application()
-    this.assetManager = new AssetManager()
     this.audioManager = new AudioManager()
-    this.inputManager = new InputManager()
-    this.sceneManager = new SceneManager(this.app, this.assetManager)
   }
 
-  /**
-   * 싱글턴 인스턴스 반환 (없으면 생성)
-   */
   static getInstance(): GameApp {
     if (!GameApp.instance) {
       GameApp.instance = new GameApp()
@@ -50,93 +26,77 @@ export class GameApp {
   }
 
   /**
-   * PixiJS 앱을 DOM 요소에 마운트하고 초기화
+   * Phaser 게임을 DOM 요소에 마운트
    */
-  async mount(container: HTMLElement, config: Partial<GameConfig> = {}): Promise<void> {
-    // StrictMode 이중 실행 방어
-    if (this.isInitialized) {
-      container.appendChild(this.app.canvas)
+  mount(container: HTMLElement): void {
+    // StrictMode 이중 실행 방어: 이미 게임 인스턴스가 있으면 캔버스만 재삽입
+    if (this.game) {
+      container.appendChild(this.game.canvas)
       return
     }
 
-    const finalConfig = { ...DEFAULT_CONFIG, ...config }
-
-    await this.app.init({
-      width: finalConfig.width,
-      height: finalConfig.height,
-      background: finalConfig.backgroundColor,
-      antialias: finalConfig.antialias,
-      resolution: finalConfig.resolution,
-      autoDensity: true,
-      resizeTo: container,
+    this.game = new Phaser.Game({
+      type: Phaser.AUTO,        // WebGL 우선, Canvas 폴백
+      parent: container,        // React ref div에 캔버스 삽입
+      width: 800,
+      height: 600,
+      backgroundColor: '#0f0f1a',
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+      },
+      physics: {
+        default: 'arcade',
+        arcade: { gravity: { x: 0, y: 0 }, debug: false },
+      },
+      scene: [PreloadScene, GameScene],
+      banner: false,
     })
 
-    container.appendChild(this.app.canvas)
-
-    // 입력 매니저에 캔버스 등록
-    this.inputManager.init(this.app.canvas)
-
-    // Zustand ↔ PixiJS 브릿지 구독 설정
     this.setupStoreBridges()
-
-    this.isInitialized = true
-
-    // PreloadScene부터 시작
-    await this.sceneManager.start()
   }
 
   /**
-   * Zustand 스토어와 PixiJS 간 브릿지 구독 설정
-   */
-  private setupStoreBridges(): void {
-    // isPaused 상태 변경 시 ticker 제어
-    useGameStore.subscribe(
-      (state) => state.isPaused,
-      (isPaused) => {
-        if (isPaused) {
-          this.app.ticker.stop()
-        } else {
-          this.app.ticker.start()
-        }
-      }
-    )
-
-    // 게임오버 시 ticker 정지
-    useGameStore.subscribe(
-      (state) => state.isGameOver,
-      (isGameOver) => {
-        if (isGameOver) {
-          this.app.ticker.stop()
-        }
-      }
-    )
-
-    // 로딩 진행률 업데이트 (AssetManager → uiStore)
-    this.assetManager.onProgress = (progress) => {
-      useUiStore.getState().setLoadingProgress(progress)
-    }
-  }
-
-  /**
-   * 캔버스를 DOM에서 제거하고 리소스 정리
+   * 캔버스를 DOM에서 제거 (React 언마운트 시 호출)
    */
   unmount(): void {
-    this.inputManager.destroy()
-    if (this.app.canvas.parentElement) {
-      this.app.canvas.parentElement.removeChild(this.app.canvas)
-    }
+    this.game?.canvas.remove()
   }
 
   /**
    * 완전한 리소스 정리 (앱 종료 시)
    */
   destroy(): void {
-    this.unmount()
-    this.sceneManager.destroy()
     this.audioManager.destroy()
-    this.inputManager.destroy()
-    this.app.destroy(true)
+    this.game?.destroy(true)
+    this.game = null
     GameApp.instance = null
-    this.isInitialized = false
+  }
+
+  /**
+   * Zustand 스토어 변경 → Phaser 씬 제어 브릿지
+   */
+  private setupStoreBridges(): void {
+    // isPaused 변경 시 GameScene 일시정지/재개
+    useGameStore.subscribe(
+      (state) => state.isPaused,
+      (isPaused) => {
+        if (isPaused) {
+          this.game?.scene.pause('GameScene')
+        } else {
+          this.game?.scene.resume('GameScene')
+        }
+      }
+    )
+
+    // 게임오버 시 GameScene 정지
+    useGameStore.subscribe(
+      (state) => state.isGameOver,
+      (isGameOver) => {
+        if (isGameOver) {
+          this.game?.scene.pause('GameScene')
+        }
+      }
+    )
   }
 }

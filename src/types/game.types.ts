@@ -1,3 +1,6 @@
+// 씬 키 (타입 안전한 씬 참조)
+export type SceneKey = 'PreloadScene' | 'GameScene'
+
 // 게임 화면 종류
 export type GameScreen = 'menu' | 'game' | 'leaderboard' | 'settings'
 
@@ -11,9 +14,7 @@ export type SceneTransition = 'fade' | 'slide' | 'none'
 export interface GameConfig {
   width: number
   height: number
-  backgroundColor: number
-  antialias: boolean
-  resolution: number
+  backgroundColor: string
 }
 
 // 리더보드 항목
@@ -91,27 +92,4 @@ export interface PlayerStoreState {
   // 액션
   setNickname: (nickname: string) => void
   updateBestScore: (score: number) => void
-}
-
-// 씬 기반 클래스용 인터페이스
-export interface IScene {
-  onEnter(): Promise<void>
-  onExit(): void
-  update(deltaTime: number): void
-}
-
-// 에셋 매니저용 타입
-export type AssetType = 'texture' | 'spritesheet' | 'sound' | 'font'
-
-export interface AssetEntry {
-  alias: string
-  src: string
-  type?: AssetType
-}
-
-// 입력 이벤트 타입
-export interface InputState {
-  keys: Set<string>
-  isPointerDown: boolean
-  pointerPosition: { x: number; y: number }
 }

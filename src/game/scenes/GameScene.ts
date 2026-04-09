@@ -1,114 +1,100 @@
-import { Graphics, Text, TextStyle } from 'pixi.js'
-import { BaseScene } from './BaseScene'
+import Phaser from 'phaser'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
-import { Player } from '../entities/Player'
-import { InputManager } from '../managers/InputManager'
 
 /**
- * 게임플레이 메인 씬 예시
- * 실제 게임 로직으로 교체 가능한 템플릿
+ * 게임플레이 메인 씬
+ * create()에서 게임 오브젝트 초기화, update()에서 매 프레임 로직 실행
  */
-export class GameScene extends BaseScene {
-  private player!: Player
-  private inputManager: InputManager
-  private scoreText!: Text
-  private background!: Graphics
-  private unsubscribes: (() => void)[] = []
+export class GameScene extends Phaser.Scene {
+  // 플레이어 (스프라이트로 교체 전 사각형 플레이스홀더)
+  private player!: Phaser.GameObjects.Rectangle
 
-  // 간단한 점수 증가 타이머 예시
+  // 키보드 입력
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
+  private wasd!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
+
+  // 점수 증가 타이머 예시
   private scoreTimer = 0
-  private readonly SCORE_INTERVAL = 60 // 60프레임마다 점수 증가
+  private readonly SCORE_INTERVAL = 60
 
   constructor() {
-    super()
-    this.inputManager = new InputManager()
+    super({ key: 'GameScene' })
   }
 
-  async onEnter(): Promise<void> {
+  create(): void {
     useGameStore.getState().resetGame()
     useGameStore.getState().setStatus('playing')
     useUiStore.getState().setScreen('game')
 
-    this.buildBackground()
     this.buildPlayer()
-    this.buildHUDOverlay()
-    this.setupInputs()
-    this.setupStoreSubscriptions()
+    this.setupInput()
   }
 
   /**
-   * 배경 생성
-   */
-  private buildBackground(): void {
-    this.background = new Graphics()
-    this.background.rect(0, 0, 800, 600).fill({ color: 0x0f0f1a })
-    this.addChildAt(this.background, 0)
-  }
-
-  /**
-   * 플레이어 생성
+   * 플레이어 생성 (사각형 플레이스홀더)
+   * 실제 스프라이트: this.physics.add.sprite(400, 300, 'player')
    */
   private buildPlayer(): void {
-    this.player = new Player()
-    this.player.position.set(400, 300)
-    this.addChild(this.player)
+    this.player = this.add.rectangle(400, 300, 40, 40, 0x6366f1)
+    this.physics.add.existing(this.player)
+
+    // 화면 경계에서 멈춤
+    const body = this.player.body as Phaser.Physics.Arcade.Body
+    body.setCollideWorldBounds(true)
   }
 
   /**
-   * PixiJS 레이어의 간단한 점수 오버레이 (React HUD와 별개)
+   * 키보드 입력 초기화
+   * - 방향키 + WASD 이동
+   * - ESC 일시정지 (Phaser → Zustand → GameApp 브릿지)
    */
-  private buildHUDOverlay(): void {
-    const style = new TextStyle({
-      fill: 'rgba(255,255,255,0.3)',
-      fontSize: 12,
-      fontFamily: 'system-ui',
-    })
-    this.scoreText = new Text({ text: 'GAME SCENE', style })
-    this.scoreText.position.set(10, 10)
-    this.addChild(this.scoreText)
-  }
-
-  /**
-   * 키보드 입력 설정
-   */
-  private setupInputs(): void {
-    // ESC 키: 일시정지
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        const { isPaused, setPaused } = useGameStore.getState()
-        setPaused(!isPaused)
-      }
+  private setupInput(): void {
+    this.cursors = this.input.keyboard!.createCursorKeys()
+    this.wasd = {
+      up:    this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+      down:  this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+      left:  this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+      right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     }
-    window.addEventListener('keydown', onKeyDown)
-    this.unsubscribes.push(() => window.removeEventListener('keydown', onKeyDown))
-  }
 
-  /**
-   * Zustand 스토어 구독 (PixiJS ↔ React 브릿지)
-   */
-  private setupStoreSubscriptions(): void {
-    // isPaused 변경 감지 (ticker는 GameApp에서 제어)
-    const unsubPause = useGameStore.subscribe(
-      (state) => state.isPaused,
-      (isPaused) => {
-        this.player.setVisible(!isPaused)
-      }
-    )
-    this.unsubscribes.push(unsubPause)
+    // ESC: 단방향 흐름 — Phaser 감지 → Zustand 변경 → GameApp.setupStoreBridges → scene.pause()
+    this.input.keyboard!.on('keydown-ESC', () => {
+      const { isPaused, setPaused } = useGameStore.getState()
+      setPaused(!isPaused)
+    })
   }
 
   /**
    * 매 프레임 업데이트
    */
-  update(deltaTime: number): void {
+  update(_time: number, _delta: number): void {
     const { isPaused, isGameOver } = useGameStore.getState()
     if (isPaused || isGameOver) return
 
-    // 플레이어 업데이트
-    this.player.update(deltaTime, this.inputManager)
+    this.handleMovement()
+    this.handleScoreTimer()
+  }
 
-    // 점수 자동 증가 예시 (실제 게임 로직으로 교체)
+  /**
+   * 플레이어 이동 처리
+   */
+  private handleMovement(): void {
+    const body = this.player.body as Phaser.Physics.Arcade.Body
+    const speed = 200
+
+    body.setVelocity(0)
+
+    if (this.cursors.left.isDown  || this.wasd.left.isDown)  body.setVelocityX(-speed)
+    if (this.cursors.right.isDown || this.wasd.right.isDown) body.setVelocityX(speed)
+    if (this.cursors.up.isDown    || this.wasd.up.isDown)    body.setVelocityY(-speed)
+    if (this.cursors.down.isDown  || this.wasd.down.isDown)  body.setVelocityY(speed)
+  }
+
+  /**
+   * 60프레임마다 점수 증가 (게임 로직 예시)
+   */
+  private handleScoreTimer(): void {
     this.scoreTimer++
     if (this.scoreTimer >= this.SCORE_INTERVAL) {
       this.scoreTimer = 0
@@ -116,14 +102,10 @@ export class GameScene extends BaseScene {
     }
   }
 
-  onExit(): void {
-    // 구독 해제
-    this.unsubscribes.forEach((unsub) => unsub())
-    this.unsubscribes = []
-
-    this.inputManager.destroy()
-
-    // 부모 클래스의 정리 (텍스처 destroy 포함)
-    super.onExit()
+  /**
+   * Phaser 내장 생명주기 훅 — scene.start() 호출 시 자동 실행
+   */
+  shutdown(): void {
+    this.scoreTimer = 0
   }
 }

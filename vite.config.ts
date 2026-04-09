@@ -18,9 +18,9 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // PixiJS를 별도 청크로 분리
+        // Phaser를 별도 청크로 분리
         manualChunks(id: string) {
-          if (id.includes('pixi.js')) return 'pixi'
+          if (id.includes('phaser')) return 'phaser'
           if (id.includes('@supabase')) return 'supabase'
           if (
             id.includes('react-dom') ||

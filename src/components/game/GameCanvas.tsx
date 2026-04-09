@@ -1,8 +1,8 @@
 import { useGameCanvas } from '@/hooks/useGameCanvas'
 
 /**
- * PixiJS 캔버스 마운트 컴포넌트
- * 이 컴포넌트가 렌더링되면 PixiJS 앱이 초기화됨
+ * Phaser 캔버스 마운트 컴포넌트
+ * 이 컴포넌트가 렌더링되면 Phaser 게임이 초기화됨
  */
 export function GameCanvas() {
   const containerRef = useGameCanvas()
