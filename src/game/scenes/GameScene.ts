@@ -29,14 +29,17 @@ export class GameScene extends Phaser.Scene {
 
     this.buildPlayer()
     this.setupInput()
+    this.setupResize()
+    this.setupPointerEvents()
   }
 
   /**
    * 플레이어 생성 (사각형 플레이스홀더)
-   * 실제 스프라이트: this.physics.add.sprite(400, 300, 'player')
+   * 실제 스프라이트: this.physics.add.sprite(640, 360, 'player')
    */
   private buildPlayer(): void {
-    this.player = this.add.rectangle(400, 300, 40, 40, 0x6366f1)
+    // 논리 해상도 중앙 (1280×720 기준)
+    this.player = this.add.rectangle(640, 360, 40, 40, 0x6366f1)
     this.physics.add.existing(this.player)
 
     // 화면 경계에서 멈춤
@@ -63,6 +66,47 @@ export class GameScene extends Phaser.Scene {
       const { isPaused, setPaused } = useGameStore.getState()
       setPaused(!isPaused)
     })
+  }
+
+  /**
+   * 마우스·터치 통합 포인터 이벤트 설정
+   * Phaser Pointer가 플랫폼별 좌표 변환을 자동 처리하므로 분기 불필요
+   * p.x, p.y → 게임 논리 좌표 (DPR·스케일 보정 완료)
+   */
+  private setupPointerEvents(): void {
+    // 씬 레벨 우클릭 차단
+    this.input.mouse?.disableContextMenu()
+
+    // 탭 / 터치 시작
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (p.rightButtonDown()) return  // 우클릭 무시
+      // onTap(p.x, p.y) 등 게임 로직 호출
+    })
+
+    // 드래그 (마우스 이동 중 누름 / 터치 이동)
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (!p.isDown) return
+      // onDrag(p.x, p.y)
+    })
+
+    // 릴리즈
+    this.input.on('pointerup', (_p: Phaser.Input.Pointer) => {
+      // onRelease()
+    })
+  }
+
+  /**
+   * 화면 리사이즈 / 기기 회전 대응
+   * Scale Manager가 감지하면 카메라 뷰포트를 새 크기에 맞게 재설정
+   */
+  private setupResize(): void {
+    this.scale.on(
+      'resize',
+      (gameSize: Phaser.Structs.Size) => {
+        this.cameras.main.setViewport(0, 0, gameSize.width, gameSize.height)
+      },
+      this
+    )
   }
 
   /**

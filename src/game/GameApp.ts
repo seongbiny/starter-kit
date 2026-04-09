@@ -35,15 +35,27 @@ export class GameApp {
       return
     }
 
+    // DPR 2 초과 디바이스(일부 모바일)는 2로 캡 — 그 이상은 성능 대비 체감 차이 미미
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+
     this.game = new Phaser.Game({
       type: Phaser.AUTO,        // WebGL 우선, Canvas 폴백
       parent: container,        // React ref div에 캔버스 삽입
-      width: 800,
-      height: 600,
+      width: 1280,
+      height: 720,              // 16:9 기준 논리 해상도
       backgroundColor: '#0f0f1a',
       scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
+        zoom: dpr,              // 내부 버퍼를 DPR배 확대 → 레티나 선명 렌더링
+      },
+      input: {
+        mouse: {
+          preventDefaultDown: true,   // 마우스다운 기본 동작 차단
+          preventDefaultUp: true,
+          preventDefaultMove: true,
+          preventDefaultWheel: true,  // 휠 스크롤 차단
+        },
       },
       physics: {
         default: 'arcade',
@@ -54,6 +66,7 @@ export class GameApp {
     })
 
     this.setupStoreBridges()
+    this.blockBrowserDefaults()
   }
 
   /**
@@ -71,6 +84,24 @@ export class GameApp {
     this.game?.destroy(true)
     this.game = null
     GameApp.instance = null
+  }
+
+  /**
+   * 브라우저 기본 동작 차단
+   * - 방향키/스페이스 페이지 스크롤 방지
+   * - 캔버스 우클릭 컨텍스트 메뉴 방지
+   */
+  private blockBrowserDefaults(): void {
+    window.addEventListener(
+      'keydown',
+      (e: KeyboardEvent) => {
+        const blocked = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']
+        if (blocked.includes(e.code)) e.preventDefault()
+      },
+      { passive: false }
+    )
+
+    this.game?.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
   }
 
   /**

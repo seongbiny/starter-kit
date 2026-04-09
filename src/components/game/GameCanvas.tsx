@@ -10,8 +10,12 @@ export function GameCanvas() {
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0"
-      style={{ zIndex: 1 }}
+      className="absolute inset-0 overflow-hidden"
+      style={{
+        zIndex: 1,
+        touchAction: 'none',  // 핀치줌, 패닝 등 브라우저 터치 제스처 차단
+        userSelect: 'none',   // 텍스트 선택 방지
+      }}
     />
   )
 }

@@ -84,6 +84,28 @@ export interface AudioState {
   toggleMute: () => void
 }
 
+// 난이도
+export type Difficulty = 'easy' | 'normal' | 'hard'
+
+// 진행도 및 통계 상태 (Zustand Store용, localStorage 영속)
+export interface ProgressState {
+  // 진행도
+  highestLevel: number
+  unlockedStages: number[]
+  difficulty: Difficulty
+
+  // 통계
+  totalPlayCount: number
+  totalPlayTimeSeconds: number
+
+  // 액션
+  setDifficulty: (difficulty: Difficulty) => void
+  unlockStage: (stage: number) => void
+  updateHighestLevel: (level: number) => void
+  recordSession: (durationSeconds: number) => void
+  resetProgress: () => void
+}
+
 // 플레이어 스토어 상태
 export interface PlayerStoreState {
   nickname: string
